@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Final Contacts - Congrats Merge</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:0}
+header{background:#006400;color:#fff;padding:14px;text-align:center}
+.container{max-width:1000px;margin:18px auto;background:#fff;padding:14px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.08)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+input,select,button{padding:10px;border-radius:8px;border:1px solid #ccc;font-size:14px}
+input[type=file]{padding:6px}
+button{cursor:pointer}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.table-wrap{overflow:auto;max-height:420px;border:1px solid #eee;border-radius:8px;padding:6px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px;border-bottom:1px solid #eee;text-align:left}
+th{background:#006400;color:#fff;position:sticky;top:0}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:12px}
+.card{background:#fff;padding:10px;border:1px solid #f0f0f0;border-radius:8px}
+.actions button{margin-right:6px}
+.small{font-size:12px;color:#666}
+</style>
+</head>
+<body>
+<header><h2>ANWAR AL KUWAIT TAILOR
+KUWAIT 9TH COMM. AREA ALWADI BLDG.NO.8 1ST FLOOR SHOP 7/1
+Phone - 41442588
+</h2></header>
+<div class="container">
+  <div class="controls">
+    <input id="searchInput" placeholder="Search name / phone / book no." style="flex:1">
+    <button onclick="searchRecords()">Search</button>
+    <button onclick="resetView()">Reset</button>
+    <button onclick="showAdd()">Add</button>
+    <button onclick="exportBackup()">Export</button>
+    <input id="importFile" type="file" accept=".json" style="display:none" onchange="importBackup(event)">
+    <button onclick="document.getElementById('importFile').click()">Import</button>
+    <button onclick="shareBackup()">Share</button>
+    <span class="small" id="resultsInfo"></span>
+  </div>
+
+  <div id="addForm" style="display:none;margin-bottom:10px">
+    <div class="row">
+      <input id="name" placeholder="Name" />
+      <input id="mobile" placeholder="Mobile" />
+      <input id="serial" placeholder="Book Number" />
+      <button onclick="saveRecord()">Save</button>
+      <button onclick="hideAdd()">Cancel</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:40px">#</th><th>Name</th><th>Mobile</th><th>Book No.</th><th style="width:140px">Action</th></tr></thead>
+      <tbody id="recordsTable"></tbody>
+    </table>
+  </div>
+
+  <div style="margin-top:12px">
+    <h4>Quick view — First 10 records</h4>
+    <div class="card-grid" id="quickGrid"></div>
+  </div>
+</div>
+
+<script>
+/* INITIAL DATA: 11337 records loaded from merged Congrats file */
+let initialData = [{"name": "Faris", "mobile": "55477503", "serial": "11101"}, {"name": "67728770", "mobile": "67728770", "serial": "1126"}, {"name": "Abdulla", "mobile": "66000031", "serial": "11500"}, {"name": "11578 Mussa", "mobile": "66577711", "serial": "11578"}, {"name": "Haider", "mobile": "65668883", "serial": "11600"}, {"name": "0559981566", "mobile": "0559981566", "serial": "1232"},{"name": "नसर 531जेड4", "mobile": "55522358", "serial": ""}];
+let db; // in-memory store (also persisted in localStorage for cross-device JSON import/export)
+let editingId = null;
+function loadDataIntoStore(items){
+  db = items.slice(); // copy
+  renderTable();
+  renderQuick();
+  document.getElementById('resultsInfo').innerText = db.length + " record(s)";
+}
+function saveRecord(){
+  const name = document.getElementById('name').value.trim();
+  const mobile = document.getElementById('mobile').value.trim();
+  const serial = document.getElementById('serial').value.trim();
+  if(!name){alert('Enter name');return;}
+  const rec = {name, mobile, serial};
+  if(editingId!==null){
+    db[editingId] = rec;
+    editingId = null;
+  }else{
+    db.push(rec);
+  }
+  storeToLocal();
+  hideAdd();
+  renderTable();
+  renderQuick();
+}
+function showAdd(){
+  document.getElementById('addForm').style.display='block';
+}
+function hideAdd(){
+  document.getElementById('addForm').style.display='none';
+  ['name','mobile','serial'].forEach(id=>document.getElementById(id).value='');
+}
+function editRecord(idx){
+  editingId = idx;
+  const r = db[idx];
+  document.getElementById('name').value = r.name||'';
+  document.getElementById('mobile').value = r.mobile||'';
+  document.getElementById('serial').value = r.serial||'';
+  showAdd();
+}
+function deleteRecord(idx){
+  if(!confirm('Delete record?'))return;
+  db.splice(idx,1);
+  storeToLocal();
+  renderTable();
+  renderQuick();
+}
+function renderTable(filter=''){
+  const tbody = document.getElementById('recordsTable');
+  tbody.innerHTML = '';
+  const q = filter.trim().toLowerCase();
+  let count=0;
+  for(let i=0;i<db.length;i++){
+    const r = db[i];
+    if(q){
+      if(!( (r.name||'').toLowerCase().includes(q) || (r.mobile||'').includes(q) || (r.serial||'').includes(q) )) continue;
+    }
+    count++;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${count}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.mobile)}</td><td>${escapeHtml(r.serial)}</td>
+      <td class="actions">
+        <button onclick="editRecord(${i})">Edit</button>
+        <button onclick="deleteRecord(${i})">Delete</button>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+  document.getElementById('resultsInfo').innerText = count + " record(s) shown";
+}
+function renderQuick(){
+  const grid = document.getElementById('quickGrid');
+  grid.innerHTML = '';
+  for(let i=0;i<Math.min(10, db.length); i++){
+    const r = db[i];
+    const div = document.createElement('div');
+    div.className='card';
+    div.innerHTML = `<strong>${escapeHtml(r.name)}</strong><div class="small">Mobile: ${escapeHtml(r.mobile)}</div><div class="small">Book: ${escapeHtml(r.serial)}</div>`;
+    grid.appendChild(div);
+  }
+}
+function searchRecords(){
+  const q = document.getElementById('searchInput').value;
+  renderTable(q);
+}
+function resetView(){
+  document.getElementById('searchInput').value='';
+  renderTable();
+}
+function exportBackup(){
+  const blob = new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'congrats_babu_backup.json';
+  a.click();
+}
+function importBackup(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try{
+      const items = JSON.parse(ev.target.result);
+      if(Array.isArray(items)){
+        db = items;
+        storeToLocal();
+        renderTable();
+        renderQuick();
+        alert('Imported ' + items.length + ' records');
+      }else alert('Invalid format: expected array of objects');
+    }catch(err){
+      alert('Import parse error: '+err);
+    }
+  };
+  reader.readAsText(file,'utf-8');
+}
+function shareBackup(){
+  const data = JSON.stringify(db);
+  if(navigator.share){
+    const blob = new Blob([data],{type:'application/json'});
+    const file = new File([blob],'congrats_babu_backup.json',{type:'application/json'});
+    navigator.share({files:[file],title:'Contacts Backup',text:'Congrats Babu contacts backup'}).catch(e=>console.log(e));
+  }else{
+    navigator.clipboard.writeText(data).then(()=>alert('JSON copied to clipboard. You can paste and save on other device.'), ()=>alert('Clipboard not available'));
+  }
+}
+function storeToLocal(){
+  try{localStorage.setItem('congrats_babu_db', JSON.stringify(db));}catch(e){console.log(e)}
+}
+function loadFromLocal(){
+  try{
+    const s = localStorage.getItem('congrats_babu_db');
+    if(s){
+      const items = JSON.parse(s);
+      if(Array.isArray(items)) return items;
+    }
+  }catch(e){}
+  return null;
+}
+function escapeHtml(s){ if(!s) return ''; return s.replace(/[&<>"']/g, function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+
+(function init(){
+  const local = loadFromLocal();
+  if(local && local.length>0){ db = local; }
+  else { db = initialData.slice(); }
+  renderTable();
+  renderQuick();
+})();
+</script>
+</body>
+</html>
